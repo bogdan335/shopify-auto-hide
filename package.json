@@ -1,0 +1,17 @@
+{
+  "name": "auto-hide-sold-out",
+  "version": "1.0.0",
+  "description": "Shopify app to auto-hide out of stock products",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@shopify/shopify-api": "^11.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "pg": "^8.13.0"
+  }
+}
