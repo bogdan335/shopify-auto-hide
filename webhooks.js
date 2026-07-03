@@ -1,8 +1,8 @@
 // webhooks.js — приём inventory_levels/update, дебаунс и обновление статусов товаров
 import express from 'express';
 import crypto from 'crypto';
-import '@shopify/shopify-api/adapters/node';
-import { shopifyApi, ApiVersion, Session } from '@shopify/shopify-api';
+import { Session } from '@shopify/shopify-api';
+import { shopify } from './shopify.js';
 import {
   getShop,
   markProductHidden,
@@ -12,14 +12,7 @@ import {
 
 const router = express.Router();
 
-const shopify = shopifyApi({
-  apiKey: process.env.SHOPIFY_API_KEY,
-  apiSecretKey: process.env.SHOPIFY_API_SECRET,
-  scopes: ['read_products', 'write_products', 'read_inventory'],
-  hostName: process.env.HOST_NAME,
-  apiVersion: '2026-07',
-  isEmbeddedApp: true,
-});
+
 
 // ---------------------------------------------------------------------------
 // Дебаунс: Shopify шлёт отдельный webhook на КАЖДУЮ позицию инвентаря.

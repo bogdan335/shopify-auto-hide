@@ -3,7 +3,7 @@ import 'dotenv/config';
 import express from 'express';
 import { initDb, closeDb } from './db.js';
 import webhooksRouter from './webhooks.js';
-
+import authRouter from './auth.js';
 const REQUIRED_ENV = [
   'DATABASE_URL',
   'SHOPIFY_API_KEY',
@@ -29,7 +29,7 @@ async function main() {
   // Роутер вебхуков монтируется ДО express.json():
   // ему нужно сырое тело запроса для проверки HMAC
   app.use(webhooksRouter);
-
+app.use(authRouter);
   app.use(express.json());
 
   app.get('/health', (_req, res) => {
