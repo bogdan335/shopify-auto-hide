@@ -1,13 +1,12 @@
 // webhooks.js — приём inventory_levels/update, дебаунс и обновление статусов товаров
 import express from 'express';
 import crypto from 'crypto';
-import { Session } from '@shopify/shopify-api';
-import { shopify } from './shopify.js';
+  import { shopifyGraphql } from './graphql.js';
 import {
-  getShop,
-  markProductHidden,
-  isProductHiddenByApp,
-  unmarkProductHidden,
+    getShop,
+    markProductHidden,
+    isProductHiddenByApp,
+    unmarkProductHidden,
 } from './db.js';
 
 const router = express.Router();
@@ -69,45 +68,10 @@ function verifyWebhookHmac(rawBody, hmacHeader) {
 // ---------------------------------------------------------------------------
 // GraphQL-хелперы с ретраями при троттлинге
 // ---------------------------------------------------------------------------
-function buildGraphqlClient(shopUrl, accessToken) {
-  const session = new Session({
-    id: `offline_${shopUrl}`,
-    shop: shopUrl,
-    state: 'offline',
-    isOnline: false,
-    accessToken,
-  });
-  return new shopify.clients.Graphql({ session });
-}
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function graphqlWithRetry(client, query, variables = {}, maxAttempts = 4) {
-  let attempt = 0;
-  let lastError = null;
 
-  while (attempt < maxAttempts) {
-    attempt += 1;
-    try {
-      const response = await client.request(query, { variables });
-      return response.data;
-    } catch (err) {
-      lastError = err;
-      const isThrottled =
-        err?.graphQLErrors?.some((e) => e?.extensions?.code === 'THROTTLED') ||
-        err?.response?.code === 429;
-
-      if (isThrottled && attempt < maxAttempts) {
-        const backoff = 1000 * 2 ** attempt; // 2s, 4s, 8s
-        console.warn(`[webhooks] Троттлинг API, повтор через ${backoff}мс (попытка ${attempt})`);
-        await sleep(backoff);
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw lastError;
-}
 
 // ---------------------------------------------------------------------------
 // Основная логика: inventory_item_id → товары → скрыть/показать
@@ -163,8 +127,7 @@ async function processBatch(shopUrl, inventoryItemIds) {
   const gids = inventoryItemIds.map((id) => `gid://shopify/InventoryItem/${id}`);
 
   for (const idsChunk of chunk(gids, 100)) {
-    const data = await graphqlWithRetry(client, INVENTORY_ITEMS_QUERY, { ids: idsChunk });
-
+  const data = await gql(INVENTORY_ITEMS_QUERY, { gids: idsChunk });
     for (const node of data?.nodes || []) {
       const product = node?.variant?.product;
       if (!product) continue; // вариант/товар мог быть удалён
@@ -189,14 +152,14 @@ async function processBatch(shopUrl, inventoryItemIds) {
       const soldOut = info.totalInventory <= 0;
 
       if (soldOut && info.status === 'ACTIVE') {
-        await setProductStatus(client, productGid, 'DRAFT');
+        await setProductStatus(gql, productGid, 'DRAFT');
         await markProductHidden(shopUrl, productGid);
         console.log(`[webhooks] ${shopUrl}: скрыт ${productGid} (sold out)`);
       } else if (!soldOut && info.status === 'DRAFT') {
         // Публикуем ТОЛЬКО то, что скрыли мы сами
         const hiddenByApp = await isProductHiddenByApp(shopUrl, productGid);
         if (hiddenByApp) {
-          await setProductStatus(client, productGid, 'ACTIVE');
+          await setProductStatus(gql, productGid, 'ACTIVE');
           await unmarkProductHidden(shopUrl, productGid);
           console.log(`[webhooks] ${shopUrl}: опубликован ${productGid} (restock)`);
         }
@@ -210,15 +173,13 @@ async function processBatch(shopUrl, inventoryItemIds) {
   }
 }
 
-async function setProductStatus(client, productGid, status) {
-  const data = await graphqlWithRetry(client, PRODUCT_UPDATE_MUTATION, {
-    input: { id: productGid, status },
-  });
+async function setProductStatus(gql, productGid, status) {
+    const data = await gql(PRODUCT_UPDATE_MUTATION, { input: { id: productGid, status } });
 
-  const userErrors = data?.productUpdate?.userErrors || [];
-  if (userErrors.length > 0) {
-    throw new Error(userErrors.map((e) => e.message).join('; '));
-  }
+    const userErrors = data?.productUpdate?.userErrors || [];
+    if (userErrors.length > 0) {
+        throw new Error(userErrors.map((e) => e.message).join('; '));
+    }
 }
 
 // ---------------------------------------------------------------------------

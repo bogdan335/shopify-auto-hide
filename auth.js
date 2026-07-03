@@ -1,4 +1,5 @@
 // auth.js — OAuth-установка приложения + автоматическая регистрация вебхука
+import { shopifyGraphql } from './graphql.js';
 import express from 'express';
 import { Session } from '@shopify/shopify-api';
 import { shopify } from './shopify.js';
@@ -92,28 +93,25 @@ router.get('/auth/callback', async (req, res) => {
 });
 
 async function registerInventoryWebhook(session) {
-  const client = new shopify.clients.Graphql({ session });
-  try {
-    const response = await client.request(WEBHOOK_CREATE_MUTATION, {
-      variables: {
-        topic: 'INVENTORY_LEVELS_UPDATE',
-        sub: {
-          callbackUrl: `https://${process.env.HOST_NAME}/webhooks/inventory-levels-update`,
-          format: 'JSON',
-        },
-      },
-    });
-    const errors = response.data?.webhookSubscriptionCreate?.userErrors || [];
-    // "already taken" при переустановке — не ошибка
-    const real = errors.filter((e) => !e.message.includes('taken'));
-    if (real.length > 0) {
-      console.error(`[auth] Ошибки регистрации вебхука: ${real.map((e) => e.message).join('; ')}`);
-    } else {
-      console.log(`[auth] Вебхук inventory_levels/update зарегистрирован для ${session.shop}`);
+    try {
+        const data = await shopifyGraphql(session.shop, session.accessToken, WEBHOOK_CREATE_MUTATION, {
+            topic: 'INVENTORY_LEVELS_UPDATE',
+            sub: {
+                callbackUrl: `https://${process.env.HOST_NAME}/webhooks/inventory-levels-update`,
+                format: 'JSON',
+            },
+        });
+
+        const errors = data?.webhookSubscriptionCreate?.userErrors || [];
+        const real = errors.filter((e) => !e.message.includes('taken'));
+        if (real.length > 0) {
+            console.error(`[auth] Ошибки регистрации вебхука: ${real.map((e) => e.message).join(', ')}`);
+        } else {
+            console.log(`[auth] Вебхук inventory_levels/update зарегистрирован для ${session.shop}`);
+        }
+    } catch (err) {
+        console.error('[auth] Не удалось зарегистрировать вебхук:', err.message);
     }
-  } catch (err) {
-    console.error('[auth] Не удалось зарегистрировать вебхук:', err.message);
-  }
 }
 
 export default router;
