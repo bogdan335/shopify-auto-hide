@@ -42,17 +42,49 @@ router.get('/auth', async (req, res) => {
 // Шаг 2: Shopify возвращает code → меняем на токен, сохраняем, вешаем вебхук
 router.get('/auth/callback', async (req, res) => {
   try {
-    const { session } = await shopify.auth.callback({
-      rawRequest: req,
-      rawResponse: res,
+    const { shop, code, hmac } = req.query;
+    if (!isValidShopDomain(shop) || !code || !hmac) {
+      return res.status(400).send('Некорректные параметры колбэка');
+    }
+
+    // Ручной обмен кода на офлайн-токен с ретраями
+    let tokenData = null;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const resp = await fetch(`https://${shop}/admin/oauth/access_token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            client_id: process.env.SHOPIFY_API_KEY,
+            client_secret: process.env.SHOPIFY_API_SECRET,
+            code,
+          }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+        tokenData = await resp.json();
+        break;
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[auth] Попытка ${attempt} обмена токена не удалась: ${err.message}`);
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
+    if (!tokenData?.access_token) throw lastErr || new Error('Не удалось получить токен');
+
+    await upsertShop(shop, tokenData.access_token);
+    console.log(`[auth] Приложение установлено на ${shop}`);
+
+    const session = new Session({
+      id: `offline_${shop}`,
+      shop,
+      state: 'manual',
+      isOnline: false,
+      accessToken: tokenData.access_token,
     });
-
-    await upsertShop(session.shop, session.accessToken);
-    console.log(`[auth] Приложение установлено на ${session.shop}`);
-
     await registerInventoryWebhook(session);
 
-    res.redirect(`https://${session.shop}/admin/apps`);
+    res.redirect(`https://${shop}/admin/apps`);
   } catch (err) {
     console.error('[auth] Ошибка OAuth-колбэка:', err.message);
     if (!res.headersSent) res.status(500).send('OAuth callback error');
