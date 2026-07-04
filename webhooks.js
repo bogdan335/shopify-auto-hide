@@ -42,12 +42,25 @@ function enqueueInventoryItem(shopUrl, inventoryItemId) {
 // Временная диагностика: помогает отличить свежие события от ретраев старых
 // доставок (Shopify ретраит неудачные вебхуки несколько часов)
 function logHmacFailure(req, shopUrl) {
+  const body = req.body;
+  const isBuf = Buffer.isBuffer(body);
+  const bodyLen = isBuf ? body.length : -1;
+  const bodyPreview = isBuf ? body.toString('utf8', 0, 120) : `не Buffer: ${typeof body}`;
+  const computed = isBuf
+    ? crypto.createHmac('sha256', process.env.SHOPIFY_API_SECRET).update(body).digest('base64')
+    : 'n/a';
   console.warn(
     `[webhooks] Невалидный HMAC от ${shopUrl || 'неизвестного источника'}: ` +
       `topic=${req.get('X-Shopify-Topic')}, ` +
       `triggered_at=${req.get('X-Shopify-Triggered-At')}, ` +
-      `webhook_id=${req.get('X-Shopify-Webhook-Id')}, ` +
-      `api_version=${req.get('X-Shopify-API-Version')}`
+      `api_version=${req.get('X-Shopify-API-Version')}, ` +
+      `content_type=${req.get('Content-Type')}, ` +
+      `content_encoding=${req.get('Content-Encoding') || 'none'}, ` +
+      `content_length=${req.get('Content-Length')}, ` +
+      `actual_body_bytes=${bodyLen}, ` +
+      `computed_hmac_prefix=${computed.slice(0, 10)}, ` +
+      `received_hmac_prefix=${(req.get('X-Shopify-Hmac-Sha256') || '').slice(0, 10)}, ` +
+      `body_preview=${JSON.stringify(bodyPreview)}`
   );
 }
 
