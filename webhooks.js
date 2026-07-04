@@ -39,6 +39,18 @@ function enqueueInventoryItem(shopUrl, inventoryItemId) {
 // ---------------------------------------------------------------------------
 // Верификация HMAC
 // ---------------------------------------------------------------------------
+// Временная диагностика: помогает отличить свежие события от ретраев старых
+// доставок (Shopify ретраит неудачные вебхуки несколько часов)
+function logHmacFailure(req, shopUrl) {
+  console.warn(
+    `[webhooks] Невалидный HMAC от ${shopUrl || 'неизвестного источника'}: ` +
+      `topic=${req.get('X-Shopify-Topic')}, ` +
+      `triggered_at=${req.get('X-Shopify-Triggered-At')}, ` +
+      `webhook_id=${req.get('X-Shopify-Webhook-Id')}, ` +
+      `api_version=${req.get('X-Shopify-API-Version')}`
+  );
+}
+
 function verifyWebhookHmac(rawBody, hmacHeader) {
   if (!hmacHeader) return false;
   const digest = crypto
@@ -168,7 +180,7 @@ router.post(
       const topic = req.get('X-Shopify-Topic');
 
       if (!verifyWebhookHmac(req.body, hmacHeader)) {
-        console.warn(`[webhooks] Невалидный HMAC от ${shopUrl || 'неизвестного источника'}`);
+        logHmacFailure(req, shopUrl);
         return res.status(401).send('Invalid HMAC');
       }
       if (topic !== 'inventory_levels/update' || !shopUrl) {
@@ -207,7 +219,7 @@ router.post(
       const topic = req.get('X-Shopify-Topic');
 
       if (!verifyWebhookHmac(req.body, hmacHeader)) {
-        console.warn(`[webhooks] Невалидный HMAC от ${shopUrl || 'неизвестного источника'}`);
+        logHmacFailure(req, shopUrl);
         return res.status(401).send('Invalid HMAC');
       }
       if (topic !== 'app/uninstalled' || !shopUrl) {
