@@ -7,6 +7,7 @@ import {
   markProductHidden,
   isProductHiddenByApp,
   unmarkProductHidden,
+  deleteShop,
 } from './db.js';
 
 const router = express.Router();
@@ -188,6 +189,43 @@ router.post(
       enqueueInventoryItem(shopUrl, payload.inventory_item_id);
     } catch (err) {
       console.error('[webhooks] Необработанная ошибка роута:', err.message);
+      if (!res.headersSent) res.status(500).send('Internal error');
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Роут вебхука app/uninstalled: мерчант удалил приложение → чистим БД
+// ---------------------------------------------------------------------------
+router.post(
+  '/webhooks/app-uninstalled',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    try {
+      const hmacHeader = req.get('X-Shopify-Hmac-Sha256');
+      const shopUrl = req.get('X-Shopify-Shop-Domain');
+      const topic = req.get('X-Shopify-Topic');
+
+      if (!verifyWebhookHmac(req.body, hmacHeader)) {
+        console.warn(`[webhooks] Невалидный HMAC от ${shopUrl || 'неизвестного источника'}`);
+        return res.status(401).send('Invalid HMAC');
+      }
+      if (topic !== 'app/uninstalled' || !shopUrl) {
+        return res.status(400).send('Bad request');
+      }
+
+      res.status(200).send('OK');
+
+      const batch = pendingBatches.get(shopUrl);
+      if (batch) {
+        clearTimeout(batch.timer);
+        pendingBatches.delete(shopUrl);
+      }
+
+      await deleteShop(shopUrl);
+      console.log(`[webhooks] ${shopUrl}: приложение удалено, запись очищена из БД`);
+    } catch (err) {
+      console.error('[webhooks] Ошибка обработки app/uninstalled:', err.message);
       if (!res.headersSent) res.status(500).send('Internal error');
     }
   }

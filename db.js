@@ -120,6 +120,14 @@ export async function unmarkProductHidden(shopUrl, productId) {
 }
 
 /**
+ * Удаляет магазин из БД (вызывается по вебхуку app/uninstalled).
+ * hidden_products для этого магазина удалятся каскадно.
+ */
+export async function deleteShop(shopUrl) {
+  await pool.query('DELETE FROM shops WHERE shop_url = $1', [shopUrl]);
+}
+
+/**
  * Корректно закрывает пул соединений при остановке сервера.
  */
 export async function closeDb() {

@@ -83,7 +83,8 @@ router.get('/auth/callback', async (req, res) => {
       isOnline: false,
       accessToken: tokenData.access_token,
     });
-    await registerInventoryWebhook(session);
+    await registerWebhook(session, 'INVENTORY_LEVELS_UPDATE', '/webhooks/inventory-levels-update');
+    await registerWebhook(session, 'APP_UNINSTALLED', '/webhooks/app-uninstalled');
 
     res.redirect(`https://${shop}/admin/apps`);
   } catch (err) {
@@ -92,12 +93,12 @@ router.get('/auth/callback', async (req, res) => {
   }
 });
 
-async function registerInventoryWebhook(session) {
+async function registerWebhook(session, topic, callbackPath) {
     try {
         const data = await shopifyGraphql(session.shop, session.accessToken, WEBHOOK_CREATE_MUTATION, {
-            topic: 'INVENTORY_LEVELS_UPDATE',
+            topic,
             sub: {
-                callbackUrl: `https://${process.env.HOST_NAME}/webhooks/inventory-levels-update`,
+                callbackUrl: `https://${process.env.HOST_NAME}${callbackPath}`,
                 format: 'JSON',
             },
         });
@@ -105,12 +106,12 @@ async function registerInventoryWebhook(session) {
         const errors = data?.webhookSubscriptionCreate?.userErrors || [];
         const real = errors.filter((e) => !e.message.includes('taken'));
         if (real.length > 0) {
-            console.error(`[auth] Ошибки регистрации вебхука: ${real.map((e) => e.message).join(', ')}`);
+            console.error(`[auth] Ошибки регистрации вебхука ${topic}: ${real.map((e) => e.message).join(', ')}`);
         } else {
-            console.log(`[auth] Вебхук inventory_levels/update зарегистрирован для ${session.shop}`);
+            console.log(`[auth] Вебхук ${topic} зарегистрирован для ${session.shop}`);
         }
     } catch (err) {
-        console.error('[auth] Не удалось зарегистрировать вебхук:', err.message);
+        console.error(`[auth] Не удалось зарегистрировать вебхук ${topic}:`, err.message);
     }
 }
 
