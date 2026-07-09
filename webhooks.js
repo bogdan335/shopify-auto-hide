@@ -264,4 +264,49 @@ router.post(
   }
 );
 
+// ---------------------------------------------------------------------------
+// GDPR/compliance-вебхуки (обязательны для ревью App Store).
+// Их нельзя зарегистрировать через API — URL прописывается в Dev Dashboard,
+// все три топика ведут на этот endpoint. Данных покупателей мы не храним,
+// поэтому по customers/* делать нечего; по shop/redact подчищаем магазин.
+// ---------------------------------------------------------------------------
+const COMPLIANCE_TOPICS = new Set([
+  'customers/data_request',
+  'customers/redact',
+  'shop/redact',
+]);
+
+router.post(
+  '/webhooks/compliance',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    try {
+      const hmacHeader = req.get('X-Shopify-Hmac-Sha256');
+      const shopUrl = req.get('X-Shopify-Shop-Domain');
+      const topic = req.get('X-Shopify-Topic');
+
+      // Ревью Shopify проверяет: невалидная подпись должна получать 401
+      if (!verifyWebhookHmac(req.body, hmacHeader)) {
+        logHmacFailure(req, shopUrl);
+        return res.status(401).send('Invalid HMAC');
+      }
+      if (!COMPLIANCE_TOPICS.has(topic) || !shopUrl) {
+        return res.status(400).send('Bad request');
+      }
+
+      res.status(200).send('OK');
+      console.log(`[webhooks] ${shopUrl}: compliance-вебхук ${topic} обработан`);
+
+      // shop/redact: окончательная зачистка данных магазина (идемпотентно —
+      // app/uninstalled обычно уже всё удалил)
+      if (topic === 'shop/redact') {
+        await deleteShop(shopUrl);
+      }
+    } catch (err) {
+      console.error('[webhooks] Ошибка обработки compliance-вебхука:', err.message);
+      if (!res.headersSent) res.status(500).send('Internal error');
+    }
+  }
+);
+
 export default router;
