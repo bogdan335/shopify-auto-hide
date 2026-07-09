@@ -46,9 +46,15 @@ function logHmacFailure(req, shopUrl) {
   const isBuf = Buffer.isBuffer(body);
   const bodyLen = isBuf ? body.length : -1;
   const bodyPreview = isBuf ? body.toString('utf8', 0, 120) : `не Buffer: ${typeof body}`;
+  const secret = process.env.SHOPIFY_API_SECRET;
   const computed = isBuf
-    ? crypto.createHmac('sha256', process.env.SHOPIFY_API_SECRET).update(body).digest('base64')
+    ? crypto.createHmac('sha256', secret).update(body).digest('base64')
     : 'n/a';
+  // Проверяем гипотезу: в env-переменной прицепился пробел/перенос строки
+  const computedTrimmed = isBuf
+    ? crypto.createHmac('sha256', secret.trim()).update(body).digest('base64')
+    : 'n/a';
+  const trimmedMatches = computedTrimmed === req.get('X-Shopify-Hmac-Sha256');
   console.warn(
     `[webhooks] Невалидный HMAC от ${shopUrl || 'неизвестного источника'}: ` +
       `topic=${req.get('X-Shopify-Topic')}, ` +
@@ -60,6 +66,8 @@ function logHmacFailure(req, shopUrl) {
       `actual_body_bytes=${bodyLen}, ` +
       `computed_hmac_prefix=${computed.slice(0, 10)}, ` +
       `received_hmac_prefix=${(req.get('X-Shopify-Hmac-Sha256') || '').slice(0, 10)}, ` +
+      `secret_len=${secret.length}, secret_trimmed_len=${secret.trim().length}, ` +
+      `trimmed_matches=${trimmedMatches}, ` +
       `body_preview=${JSON.stringify(bodyPreview)}`
   );
 }
