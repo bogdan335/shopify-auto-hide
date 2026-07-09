@@ -1,0 +1,26 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "3534d2c71f0113ab3118596b315692dc"
+application_url = "https://shopify-auto-hide-production.up.railway.app"
+embedded = true
+name = "Auto-Hide Sold Out"
+
+[webhooks]
+api_version = "2026-07"
+
+  # GDPR-вебхуки (обязательны для App Store). Обычные вебхуки
+  # (inventory, app/uninstalled) регистрируются кодом в auth.js.
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "https://shopify-auto-hide-production.up.railway.app/webhooks/compliance"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_inventory,read_products,write_products"
+optional_scopes = [ ]
+use_legacy_install_flow = true
+
+[auth]
+redirect_urls = [
+  "https://shopify-auto-hide-production.up.railway.app/auth/callback"
+]
