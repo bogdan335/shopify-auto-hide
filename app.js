@@ -120,6 +120,73 @@ router.get('/api/hidden-products', requireSession, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Privacy policy (обязательна для листинга в App Store)
+// ---------------------------------------------------------------------------
+router.get('/privacy', (_req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Auto-Hide Sold Out</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         max-width: 680px; margin: 0 auto; padding: 40px 20px; color: #303030; line-height: 1.65; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h2 { font-size: 17px; margin: 28px 0 8px; }
+  .updated { color: #616161; font-size: 13px; margin-bottom: 24px; }
+  ul { padding-left: 20px; }
+  a { color: #005bd3; }
+</style>
+</head>
+<body>
+<h1>Privacy Policy</h1>
+<p class="updated">Auto-Hide Sold Out · Last updated: July 10, 2026</p>
+
+<p>Auto-Hide Sold Out ("the App") automatically hides sold-out products in your
+Shopify store and republishes them when restocked. We built the App to collect
+as little data as possible.</p>
+
+<h2>What we store</h2>
+<ul>
+  <li><strong>Your store's myshopify.com domain</strong> — to know which store the App is installed on.</li>
+  <li><strong>API access tokens</strong> — to update product statuses on your behalf. Tokens are short-lived and refreshed automatically.</li>
+  <li><strong>IDs of products the App has hidden</strong> — so we only republish products that the App itself hid, never drafts you created manually.</li>
+  <li><strong>Your App settings</strong> — currently a single on/off preference.</li>
+</ul>
+
+<h2>What we never collect</h2>
+<ul>
+  <li>No customer data of any kind: no names, emails, addresses, orders, or payment details.</li>
+  <li>No analytics, tracking pixels, or advertising identifiers.</li>
+  <li>No staff account information.</li>
+</ul>
+
+<h2>Data deletion</h2>
+<p>When you uninstall the App, all data associated with your store — domain,
+tokens, settings, and the hidden-products list — is deleted automatically.
+We also honor Shopify's mandatory GDPR webhooks
+(<em>customers/data_request</em>, <em>customers/redact</em>, <em>shop/redact</em>);
+since we store no customer data, there is nothing to disclose or redact.</p>
+
+<h2>Data sharing</h2>
+<p>We do not sell, rent, or share any data with third parties. Data is stored
+with our hosting provider (Railway) in a private database and is used solely
+to provide the App's functionality.</p>
+
+<h2>Billing</h2>
+<p>Subscription payments are processed entirely by Shopify's Billing API.
+We never see or store your payment information.</p>
+
+<h2>Contact</h2>
+<p>Questions about this policy or your data:
+<a href="mailto:balatnikowbogdan@gmail.com">balatnikowbogdan@gmail.com</a>.
+We usually reply within one business day.</p>
+</body>
+</html>`);
+});
+
+// ---------------------------------------------------------------------------
 // Embedded страница (корень приложения в админке)
 // ---------------------------------------------------------------------------
 router.get('/', async (req, res) => {
