@@ -32,6 +32,14 @@ export async function initDb() {
       );
     `);
 
+    // Истекающие offline-токены (обязательны для публичных приложений с 2026)
+    await client.query(`
+      ALTER TABLE shops ADD COLUMN IF NOT EXISTS refresh_token TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE shops ADD COLUMN IF NOT EXISTS token_expires_at TIMESTAMPTZ;
+    `);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS hidden_products (
         id         SERIAL PRIMARY KEY,
@@ -63,23 +71,27 @@ export async function initDb() {
  */
 export async function getShop(shopUrl) {
   const { rows } = await pool.query(
-    'SELECT id, shop_url, access_token FROM shops WHERE shop_url = $1',
+    `SELECT id, shop_url, access_token, refresh_token, token_expires_at
+     FROM shops WHERE shop_url = $1`,
     [shopUrl]
   );
   return rows[0] || null;
 }
 
 /**
- * Создаёт или обновляет магазин (используется в OAuth-колбэке).
+ * Создаёт или обновляет магазин (используется в OAuth-колбэке
+ * и при обновлении истёкшего токена).
  */
-export async function upsertShop(shopUrl, accessToken) {
+export async function upsertShop(shopUrl, accessToken, refreshToken = null, tokenExpiresAt = null) {
   const { rows } = await pool.query(
-    `INSERT INTO shops (shop_url, access_token)
-     VALUES ($1, $2)
+    `INSERT INTO shops (shop_url, access_token, refresh_token, token_expires_at)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT (shop_url)
-     DO UPDATE SET access_token = EXCLUDED.access_token
+     DO UPDATE SET access_token = EXCLUDED.access_token,
+                   refresh_token = EXCLUDED.refresh_token,
+                   token_expires_at = EXCLUDED.token_expires_at
      RETURNING id, shop_url`,
-    [shopUrl, accessToken]
+    [shopUrl, accessToken, refreshToken, tokenExpiresAt]
   );
   return rows[0];
 }

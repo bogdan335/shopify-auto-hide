@@ -4,7 +4,7 @@
 import crypto from 'crypto';
 import express from 'express';
 import { shopifyGraphql } from './graphql.js';
-import { upsertShop } from './db.js';
+import { requestAccessToken, storeTokens } from './tokens.js';
 import { hasActiveSubscription, createSubscription } from './billing.js';
 
 const router = express.Router();
@@ -142,32 +142,10 @@ router.get('/auth/callback', async (req, res) => {
       `${STATE_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`
     );
 
-    // 3. Обмен кода на офлайн-токен (вручную, с ретраями)
-    let tokenData = null;
-    let lastErr = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const resp = await fetch(`https://${shop}/admin/oauth/access_token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({
-            client_id: process.env.SHOPIFY_API_KEY,
-            client_secret: process.env.SHOPIFY_API_SECRET,
-            code,
-          }),
-        });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
-        tokenData = await resp.json();
-        break;
-      } catch (err) {
-        lastErr = err;
-        console.warn(`[auth] Попытка ${attempt} обмена токена не удалась: ${err.message}`);
-        await new Promise((r) => setTimeout(r, 1000 * attempt));
-      }
-    }
-    if (!tokenData?.access_token) throw lastErr || new Error('Не удалось получить токен');
-
-    await upsertShop(shop, tokenData.access_token);
+    // 3. Обмен кода на ИСТЕКАЮЩИЙ офлайн-токен (expiring=1 — обязательное
+    // требование для публичных приложений; вечные токены API больше не принимает)
+    const tokenData = await requestAccessToken(shop, { code, expiring: '1' });
+    await storeTokens(shop, tokenData);
     console.log(`[auth] Приложение установлено на ${shop}`);
 
     await registerWebhook(shop, tokenData.access_token, 'INVENTORY_LEVELS_UPDATE', '/webhooks/inventory-levels-update');

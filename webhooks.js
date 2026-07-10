@@ -10,6 +10,7 @@ import {
   deleteShop,
 } from './db.js';
 import { hasActiveSubscription, invalidateSubscriptionCache } from './billing.js';
+import { getFreshAccessToken } from './tokens.js';
 
 const router = express.Router();
 
@@ -130,14 +131,21 @@ async function processBatch(shopUrl, inventoryItemIds) {
     return;
   }
 
+  // Живой access-токен (обновится сам, если истёк)
+  const accessToken = await getFreshAccessToken(shopUrl);
+  if (!accessToken) {
+    console.warn(`[webhooks] ${shopUrl}: нет валидного токена, батч пропущен`);
+    return;
+  }
+
   // Без активной подписки (или триала) товары не трогаем
-  if (!(await hasActiveSubscription(shop.shop_url, shop.access_token))) {
+  if (!(await hasActiveSubscription(shopUrl, accessToken))) {
     console.log(`[webhooks] ${shopUrl}: нет активной подписки, батч пропущен`);
     return;
   }
 
   const gql = (query, variables) =>
-    shopifyGraphql(shop.shop_url, shop.access_token, query, variables);
+    shopifyGraphql(shopUrl, accessToken, query, variables);
 
   const products = new Map();
   const gids = inventoryItemIds.map((id) => `gid://shopify/InventoryItem/${id}`);
