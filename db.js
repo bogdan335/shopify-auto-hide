@@ -60,6 +60,16 @@ export async function initDb() {
       ON hidden_products (shop_url);
     `);
 
+    // Очередь inventory-событий для дебаунса: переживает рестарты контейнера
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pending_inventory_items (
+        shop_url          TEXT NOT NULL,
+        inventory_item_id TEXT NOT NULL,
+        enqueued_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (shop_url, inventory_item_id)
+      );
+    `);
+
     await client.query('COMMIT');
     console.log('[db] Схема БД инициализирована');
   } catch (err) {
@@ -164,6 +174,57 @@ export async function unmarkProductHidden(shopUrl, productId) {
  */
 export async function deleteShop(shopUrl) {
   await pool.query('DELETE FROM shops WHERE shop_url = $1', [shopUrl]);
+}
+
+/**
+ * Кладёт inventory-событие в очередь дебаунса (повтор обновляет время).
+ */
+export async function enqueuePendingItem(shopUrl, inventoryItemId) {
+  await pool.query(
+    `INSERT INTO pending_inventory_items (shop_url, inventory_item_id)
+     VALUES ($1, $2)
+     ON CONFLICT (shop_url, inventory_item_id)
+     DO UPDATE SET enqueued_at = NOW()`,
+    [shopUrl, String(inventoryItemId)]
+  );
+}
+
+/**
+ * Магазины, по которым тишина дольше debounceSeconds — пора обрабатывать.
+ */
+export async function getDueShops(debounceSeconds) {
+  const { rows } = await pool.query(
+    `SELECT shop_url FROM pending_inventory_items
+     GROUP BY shop_url
+     HAVING MAX(enqueued_at) < NOW() - ($1 || ' seconds')::interval`,
+    [String(debounceSeconds)]
+  );
+  return rows.map((r) => r.shop_url);
+}
+
+/**
+ * Читает накопленные события магазина (удаление — после успешной обработки).
+ */
+export async function getPendingItems(shopUrl) {
+  const { rows } = await pool.query(
+    'SELECT inventory_item_id FROM pending_inventory_items WHERE shop_url = $1',
+    [shopUrl]
+  );
+  return rows.map((r) => r.inventory_item_id);
+}
+
+/**
+ * Удаляет обработанные события (или все события магазина при удалении приложения).
+ */
+export async function deletePendingItems(shopUrl, itemIds = null) {
+  if (itemIds === null) {
+    await pool.query('DELETE FROM pending_inventory_items WHERE shop_url = $1', [shopUrl]);
+  } else if (itemIds.length > 0) {
+    await pool.query(
+      'DELETE FROM pending_inventory_items WHERE shop_url = $1 AND inventory_item_id = ANY($2)',
+      [shopUrl, itemIds]
+    );
+  }
 }
 
 /**

@@ -8,6 +8,10 @@ import {
   isProductHiddenByApp,
   unmarkProductHidden,
   deleteShop,
+  enqueuePendingItem,
+  getDueShops,
+  getPendingItems,
+  deletePendingItems,
 } from './db.js';
 import { hasActiveSubscription, invalidateSubscriptionCache } from './billing.js';
 import { getFreshAccessToken } from './tokens.js';
@@ -15,27 +19,48 @@ import { getFreshAccessToken } from './tokens.js';
 const router = express.Router();
 
 // ---------------------------------------------------------------------------
-// Дебаунс: копим inventory_item_id по магазину, обрабатываем после 30с тишины
+// Дебаунс через Postgres: события копятся в pending_inventory_items,
+// опросчик обрабатывает магазин после 30с тишины. Очередь переживает
+// рестарты контейнера; события удаляются после успешной обработки
+// (повторная обработка безопасна — статусы товаров идемпотентны).
 // ---------------------------------------------------------------------------
-const DEBOUNCE_MS = 30_000;
-const pendingBatches = new Map();
+const DEBOUNCE_SECONDS = 30;
+const POLL_INTERVAL_MS = 10_000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function enqueueInventoryItem(shopUrl, inventoryItemId) {
-  let batch = pendingBatches.get(shopUrl);
-  if (!batch) {
-    batch = { timer: null, itemIds: new Set() };
-    pendingBatches.set(shopUrl, batch);
+  enqueuePendingItem(shopUrl, inventoryItemId).catch((err) => {
+    console.error(`[webhooks] Не удалось поставить событие в очередь для ${shopUrl}:`, err.message);
+  });
+}
+
+let pollerRunning = false;
+
+async function pollPendingBatches() {
+  if (pollerRunning) return; // не пускаем два прохода одновременно
+  pollerRunning = true;
+  try {
+    for (const shopUrl of await getDueShops(DEBOUNCE_SECONDS)) {
+      const itemIds = await getPendingItems(shopUrl);
+      if (itemIds.length === 0) continue;
+      try {
+        await processBatch(shopUrl, itemIds);
+        await deletePendingItems(shopUrl, itemIds);
+      } catch (err) {
+        console.error(`[webhooks] Ошибка обработки батча для ${shopUrl}:`, err.message);
+        // события остаются в очереди — попробуем на следующем проходе
+      }
+    }
+  } catch (err) {
+    console.error('[webhooks] Ошибка опросчика очереди:', err.message);
+  } finally {
+    pollerRunning = false;
   }
-  batch.itemIds.add(String(inventoryItemId));
-  if (batch.timer) clearTimeout(batch.timer);
-  batch.timer = setTimeout(() => {
-    const itemIds = [...batch.itemIds];
-    pendingBatches.delete(shopUrl);
-    processBatch(shopUrl, itemIds).catch((err) => {
-      console.error(`[webhooks] Ошибка обработки батча для ${shopUrl}:`, err.message);
-    });
-  }, DEBOUNCE_MS);
+}
+
+export function startBatchPoller() {
+  setInterval(pollPendingBatches, POLL_INTERVAL_MS).unref();
+  console.log(`[webhooks] Опросчик очереди запущен (каждые ${POLL_INTERVAL_MS / 1000}с)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -271,12 +296,7 @@ router.post(
 
       res.status(200).send('OK');
 
-      const batch = pendingBatches.get(shopUrl);
-      if (batch) {
-        clearTimeout(batch.timer);
-        pendingBatches.delete(shopUrl);
-      }
-
+      await deletePendingItems(shopUrl);
       await deleteShop(shopUrl);
       invalidateSubscriptionCache(shopUrl);
       console.log(`[webhooks] ${shopUrl}: приложение удалено, запись очищена из БД`);

@@ -2,7 +2,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { initDb, closeDb } from './db.js';
-import webhooksRouter from './webhooks.js';
+import webhooksRouter, { startBatchPoller } from './webhooks.js';
 import authRouter from './auth.js';
 import appRouter from './app.js';
 const REQUIRED_ENV = [
@@ -23,6 +23,7 @@ function validateEnv() {
 async function main() {
   validateEnv();
   await initDb();
+  startBatchPoller();
 
   const app = express();
   app.disable('x-powered-by');
