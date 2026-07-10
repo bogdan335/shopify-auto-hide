@@ -205,7 +205,7 @@ function renderAppPage() {
   }
   .switch input:checked + .slider { background: var(--accent); }
   .switch input:checked + .slider:before { transform: translateX(18px); }
-  .switch input:disabled + .slider { opacity: .5; cursor: wait; }
+  .switch input:disabled + .slider { opacity: .5; }
   /* Статистика */
   .stat { font-size: 28px; font-weight: 700; letter-spacing: -.5px; }
   /* Таблица */
@@ -338,21 +338,23 @@ function renderAppPage() {
       toggle.disabled = false;
       renderStatus(settings.autoHideEnabled);
 
-      toggle.addEventListener('change', async () => {
-        toggle.disabled = true;
-        try {
-          const result = await api('/api/settings', {
-            method: 'POST',
-            body: JSON.stringify({ autoHideEnabled: toggle.checked }),
-          });
-          renderStatus(result.autoHideEnabled);
-          toast(result.autoHideEnabled ? 'Auto-hide enabled' : 'Auto-hide paused');
-        } catch (err) {
-          toggle.checked = !toggle.checked;
+      // Оптимистичное сохранение: UI переключается мгновенно,
+      // запрос уходит в фоне; при ошибке откатываемся.
+      let saveSeq = 0;
+      toggle.addEventListener('change', () => {
+        const desired = toggle.checked;
+        const seq = ++saveSeq;
+        renderStatus(desired);
+        toast(desired ? 'Auto-hide enabled' : 'Auto-hide paused');
+        api('/api/settings', {
+          method: 'POST',
+          body: JSON.stringify({ autoHideEnabled: desired }),
+        }).catch(() => {
+          if (seq !== saveSeq) return; // уже переключили ещё раз
+          toggle.checked = !desired;
+          renderStatus(!desired);
           toast('Could not save — try again');
-        } finally {
-          toggle.disabled = false;
-        }
+        });
       });
 
       const data = await api('/api/hidden-products');
