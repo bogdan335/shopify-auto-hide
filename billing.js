@@ -3,7 +3,7 @@ import { shopifyGraphql } from './graphql.js';
 
 const PLAN_NAME = 'Auto-Hide Sold Out';
 const PLAN_PRICE = 6.99;
-const TRIAL_DAYS = 7;
+const TRIAL_DAYS = 14;
 
 // По умолчанию подписки ТЕСТОВЫЕ (без реальных денег). Реальный биллинг
 // включается только явным BILLING_TEST=false на Railway перед сабмитом.
