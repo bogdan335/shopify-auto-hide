@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import express from 'express';
 import { shopifyGraphql } from './graphql.js';
 import { upsertShop } from './db.js';
+import { hasActiveSubscription, createSubscription } from './billing.js';
 
 const router = express.Router();
 
@@ -172,7 +173,20 @@ router.get('/auth/callback', async (req, res) => {
     await registerWebhook(shop, tokenData.access_token, 'INVENTORY_LEVELS_UPDATE', '/webhooks/inventory-levels-update');
     await registerWebhook(shop, tokenData.access_token, 'APP_UNINSTALLED', '/webhooks/app-uninstalled');
 
-    res.redirect(`https://${shop}/admin/apps`);
+    // Биллинг: без активной подписки отправляем на страницу подтверждения
+    // оплаты ($6.99/мес, 7 дней триала). Уже подписан — сразу в админку.
+    try {
+      if (await hasActiveSubscription(shop, tokenData.access_token)) {
+        return res.redirect(`https://${shop}/admin/apps`);
+      }
+      const confirmationUrl = await createSubscription(shop, tokenData.access_token);
+      console.log(`[auth] ${shop}: подписка создана, мерчант отправлен на подтверждение`);
+      return res.redirect(confirmationUrl);
+    } catch (err) {
+      // Не роняем установку из-за сбоя биллинга: попробуем при следующем заходе
+      console.error(`[auth] ${shop}: ошибка биллинга:`, err.message);
+      return res.redirect(`https://${shop}/admin/apps`);
+    }
   } catch (err) {
     console.error('[auth] Ошибка OAuth-колбэка:', err.message);
     if (!res.headersSent) res.status(500).send('OAuth callback error');

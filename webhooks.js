@@ -9,6 +9,7 @@ import {
   unmarkProductHidden,
   deleteShop,
 } from './db.js';
+import { hasActiveSubscription, invalidateSubscriptionCache } from './billing.js';
 
 const router = express.Router();
 
@@ -126,6 +127,12 @@ async function processBatch(shopUrl, inventoryItemIds) {
   const shop = await getShop(shopUrl);
   if (!shop) {
     console.warn(`[webhooks] Магазин ${shopUrl} не найден в БД, батч пропущен`);
+    return;
+  }
+
+  // Без активной подписки (или триала) товары не трогаем
+  if (!(await hasActiveSubscription(shop.shop_url, shop.access_token))) {
+    console.log(`[webhooks] ${shopUrl}: нет активной подписки, батч пропущен`);
     return;
   }
 
@@ -256,6 +263,7 @@ router.post(
       }
 
       await deleteShop(shopUrl);
+      invalidateSubscriptionCache(shopUrl);
       console.log(`[webhooks] ${shopUrl}: приложение удалено, запись очищена из БД`);
     } catch (err) {
       console.error('[webhooks] Ошибка обработки app/uninstalled:', err.message);
