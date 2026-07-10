@@ -20,9 +20,16 @@ export async function shopifyGraphql(shop, accessToken, query, variables = {}, m
             }
 
             const json = await resp.json();
-            
-            if (json.errors && json.errors.some(e => e.message === 'Throttled')) {
-                throw Object.assign(new Error('Throttled'), { retryable: true });
+
+            // Shopify возвращает errors то массивом объектов, то строкой
+            if (json.errors) {
+                const errors = Array.isArray(json.errors)
+                    ? json.errors
+                    : [{ message: String(json.errors) }];
+                if (errors.some((e) => e.message === 'Throttled')) {
+                    throw Object.assign(new Error('Throttled'), { retryable: true });
+                }
+                throw new Error(`GraphQL: ${errors.map((e) => e.message).join('; ')}`);
             }
 
             return json.data;
