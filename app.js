@@ -199,9 +199,11 @@ router.get('/', async (req, res) => {
       .send('Auto-Hide Sold Out. Установка: /auth?shop=your-store.myshopify.com');
   }
 
-  // Магазин не установлен → на OAuth (выпрыгиваем из iframe наверх)
+  // Магазин не установлен или токен уже не спасти (например, пропущен
+  // вебхук удаления) → на OAuth (выпрыгиваем из iframe наверх)
   const record = await getShop(shop);
-  if (!record) {
+  const accessToken = record ? await getFreshAccessToken(shop) : null;
+  if (!record || !accessToken) {
     return res.send(
       `<!DOCTYPE html><html><body>
         <script>window.open(${JSON.stringify(`https://${process.env.HOST_NAME}/auth?shop=${shop}`)}, '_top');</script>
