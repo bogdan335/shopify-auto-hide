@@ -4,6 +4,7 @@ import express from 'express';
 import { initDb, closeDb } from './db.js';
 import webhooksRouter from './webhooks.js';
 import authRouter from './auth.js';
+import appRouter from './app.js';
 const REQUIRED_ENV = [
   'DATABASE_URL',
   'SHOPIFY_API_KEY',
@@ -29,8 +30,10 @@ async function main() {
   // Роутер вебхуков монтируется ДО express.json():
   // ему нужно сырое тело запроса для проверки HMAC
   app.use(webhooksRouter);
-app.use(authRouter);
+  app.use(authRouter);
   app.use(express.json());
+  // Embedded страница настроек и её API (нужен разобранный JSON)
+  app.use(appRouter);
 
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok', uptime: process.uptime() });

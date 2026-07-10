@@ -173,6 +173,13 @@ async function processBatch(shopUrl, inventoryItemIds) {
 
       const soldOut = info.totalInventory <= 0;
 
+      // Пауза (тумблер в настройках) останавливает только скрытие новых
+      // sold-out; возврат при пополнении работает всегда, чтобы товары
+      // не застревали в Draft.
+      if (soldOut && info.status === 'ACTIVE' && shop.auto_hide_enabled === false) {
+        continue;
+      }
+
       if (soldOut && info.status === 'ACTIVE') {
         await setProductStatus(gql, productGid, 'DRAFT');
         await markProductHidden(shopUrl, productGid);

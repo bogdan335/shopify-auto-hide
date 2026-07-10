@@ -40,6 +40,11 @@ export async function initDb() {
       ALTER TABLE shops ADD COLUMN IF NOT EXISTS token_expires_at TIMESTAMPTZ;
     `);
 
+    // Настройки приложения (страница настроек)
+    await client.query(`
+      ALTER TABLE shops ADD COLUMN IF NOT EXISTS auto_hide_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+    `);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS hidden_products (
         id         SERIAL PRIMARY KEY,
@@ -71,11 +76,33 @@ export async function initDb() {
  */
 export async function getShop(shopUrl) {
   const { rows } = await pool.query(
-    `SELECT id, shop_url, access_token, refresh_token, token_expires_at
+    `SELECT id, shop_url, access_token, refresh_token, token_expires_at, auto_hide_enabled
      FROM shops WHERE shop_url = $1`,
     [shopUrl]
   );
   return rows[0] || null;
+}
+
+/**
+ * Включает/выключает автоскрытие для магазина (тумблер на странице настроек).
+ */
+export async function setAutoHideEnabled(shopUrl, enabled) {
+  await pool.query(
+    'UPDATE shops SET auto_hide_enabled = $2 WHERE shop_url = $1',
+    [shopUrl, enabled]
+  );
+}
+
+/**
+ * Список товаров, скрытых приложением (для страницы настроек).
+ */
+export async function listHiddenProducts(shopUrl) {
+  const { rows } = await pool.query(
+    `SELECT product_id, hidden_at FROM hidden_products
+     WHERE shop_url = $1 ORDER BY hidden_at DESC LIMIT 250`,
+    [shopUrl]
+  );
+  return rows;
 }
 
 /**
