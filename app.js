@@ -272,7 +272,7 @@ function renderAppPage() {
     left: 2px; top: 2px; background: #fff; transition: transform .15s;
     box-shadow: 0 1px 2px rgba(0,0,0,.25);
   }
-  .switch input:checked + .slider { background: var(--accent); }
+  .switch input:checked + .slider { background: #34C759; }
   .switch input:checked + .slider:before { transform: translateX(18px); }
   .switch input:disabled + .slider { opacity: .5; }
   /* Статистика */
