@@ -240,9 +240,11 @@ function renderAppPage() {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5;
   }
-  .page { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
-  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-  .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -.2px; }
+  .page { max-width: 720px; margin: 0 auto; padding: 32px 16px 48px; }
+  .header { display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -.2px; }
+  .section { padding: 20px 0; }
+  .section + .section { border-top: 1px solid var(--border); }
   .badge {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 550;
@@ -279,7 +281,7 @@ function renderAppPage() {
   .stat { font-size: 28px; font-weight: 700; letter-spacing: -.5px; }
   /* Таблица */
   table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-weight: 550; color: var(--subtext); padding: 8px 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  th { text-align: left; font-weight: 600; color: #8a8a8a; padding: 8px 8px; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
   td { padding: 10px 8px; border-bottom: 1px solid var(--border); }
   tr:last-child td { border-bottom: none; }
   td a { color: #005bd3; text-decoration: none; font-weight: 500; }
@@ -300,38 +302,34 @@ function renderAppPage() {
 </head>
 <body>
 <div class="page">
-  <div class="header">
-    <h1>Auto-Hide Sold Out</h1>
-    <span class="badge on" id="statusBadge" hidden><span class="dot"></span><span id="statusText">Active</span></span>
-  </div>
-
-  <div class="card">
-    <div class="row">
-      <div>
-        <h2>Automatically hide sold-out products</h2>
-        <p class="muted">When total inventory across all locations reaches zero, the product
-        is set to Draft. As soon as it's restocked, it goes back to Active — automatically.</p>
-      </div>
-      <label class="switch">
-        <input type="checkbox" id="autoHideToggle" disabled>
-        <span class="slider"></span>
-      </label>
+  <div class="card" style="padding: 6px 28px;">
+    <div class="section header">
+      <h1>Auto-Hide Sold Out</h1>
+      <span class="badge on" id="statusBadge" hidden><span class="dot"></span><span id="statusText">Active</span></span>
     </div>
-    <p class="muted" id="pauseNote" style="margin-top:8px" hidden>
-      Paused: new sold-outs stay visible. Products already hidden by the app will still
-      be re-published when restocked.
-    </p>
-  </div>
 
-  <div class="card">
-    <h2>Currently hidden by the app</h2>
-    <div class="stat" id="hiddenCount"><div class="skeleton" style="width:40px;height:28px"></div></div>
-    <p class="muted">These products are in Draft and will return to Active on restock.</p>
-  </div>
+    <div class="section">
+      <div class="row">
+        <h2>Automatically hide sold-out products</h2>
+        <label class="switch">
+          <input type="checkbox" id="autoHideToggle" disabled>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <p class="muted" id="pauseNote" style="margin-top:8px" hidden>
+        Paused: new sold-outs stay visible. Products already hidden by the app will still
+        be re-published when restocked.
+      </p>
+    </div>
 
-  <div class="card">
-    <h2 style="margin-bottom:8px">Hidden products</h2>
-    <div id="productList"><div class="skeleton" style="width:100%"></div></div>
+    <div class="section">
+      <h2>Currently hidden by the app</h2>
+      <div class="stat" id="hiddenCount"><div class="skeleton" style="width:40px;height:28px"></div></div>
+    </div>
+
+    <div class="section">
+      <div id="productList"><div class="skeleton" style="width:100%"></div></div>
+    </div>
   </div>
 
   <div class="footer">
