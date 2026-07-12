@@ -155,7 +155,7 @@ router.get('/auth/callback', async (req, res) => {
     // оплаты ($6.99/мес, 7 дней триала). Уже подписан — сразу в админку.
     try {
       if (await hasActiveSubscription(shop, tokenData.access_token)) {
-        return res.redirect(`https://${shop}/admin/apps`);
+        return res.redirect(`https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`);
       }
       const confirmationUrl = await createSubscription(shop, tokenData.access_token);
       console.log(`[auth] ${shop}: подписка создана, мерчант отправлен на подтверждение`);
@@ -163,7 +163,7 @@ router.get('/auth/callback', async (req, res) => {
     } catch (err) {
       // Не роняем установку из-за сбоя биллинга: попробуем при следующем заходе
       console.error(`[auth] ${shop}: ошибка биллинга:`, err.message);
-      return res.redirect(`https://${shop}/admin/apps`);
+      return res.redirect(`https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`);
     }
   } catch (err) {
     console.error('[auth] Ошибка OAuth-колбэка:', err.message);

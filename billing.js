@@ -76,7 +76,7 @@ export async function hasActiveSubscription(shop, accessToken) {
 export async function createSubscription(shop, accessToken) {
   const data = await shopifyGraphql(shop, accessToken, SUBSCRIPTION_CREATE_MUTATION, {
     name: PLAN_NAME,
-    returnUrl: `https://${shop}/admin/apps`,
+    returnUrl: `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`,
     test: IS_TEST,
     trialDays: TRIAL_DAYS,
     lineItems: [
