@@ -180,7 +180,7 @@ We never see or store your payment information.</p>
 
 <h2>Contact</h2>
 <p>Questions about this policy or your data:
-<a href="mailto:balatnikowbogdan@gmail.com">balatnikowbogdan@gmail.com</a>.
+<a href="mailto:bulatnikovbogdan8@gmail.com">bulatnikovbogdan8@gmail.com</a>.
 We usually reply within one business day.</p>
 </body>
 </html>`);
@@ -333,7 +333,7 @@ function renderAppPage() {
   </div>
 
   <div class="footer">
-    Questions or ideas? <a href="mailto:balatnikowbogdan@gmail.com">Get in touch</a> — we reply fast.
+    Questions or ideas? <a href="mailto:bulatnikovbogdan8@gmail.com">Get in touch</a> — we reply fast.
   </div>
 </div>
 <div class="toast" id="toast"></div>
